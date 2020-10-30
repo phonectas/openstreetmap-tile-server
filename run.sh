@@ -2,6 +2,15 @@
 
 set -x
 
+TILESERVER_DATA_PATH=${TILESERVER_DATA_PATH:="/tileserverdata"}
+TILESERVER_STORAGE_PATH=${TILESERVER_STORAGE_PATH:="/mnt/azure"}
+TILESERVER_DATA_LABEL=${TILESERVER_DATA_LABEL:="data"}
+
+if [ "$TILESERVER_MODE" != "CREATE" ] && [ "$TILESERVER_MODE" != "RESTORE" ]; then
+    # Default to CREATE
+    TILESERVER_MODE="CREATE"
+fi
+
 function createPostgresConfig() {
   cp /etc/postgresql/12/main/postgresql.custom.conf.tmpl /etc/postgresql/12/main/conf.d/postgresql.custom.conf
   sudo -u postgres echo "autovacuum = $AUTOVACUUM" >> /etc/postgresql/12/main/conf.d/postgresql.custom.conf
@@ -23,7 +32,7 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
-if [ "$1" = "import" ]; then
+if [ "$TILESERVER_MODE" == "CREATE" ]; then
     # Ensure that database directory is in right state
     chown postgres:postgres -R /var/lib/postgresql
     if [ ! -f /var/lib/postgresql/12/main/PG_VERSION ]; then
@@ -41,11 +50,11 @@ if [ "$1" = "import" ]; then
     sudo -u postgres psql -d gis -c "ALTER TABLE spatial_ref_sys OWNER TO renderer;"
     setPostgresPassword
 
-    # Download Luxembourg as sample if no data is provided
+    # Download norway as sample if no data is provided
     if [ ! -f /data.osm.pbf ] && [ -z "$DOWNLOAD_PBF" ]; then
-        echo "WARNING: No import file at /data.osm.pbf, so importing Luxembourg as example..."
-        DOWNLOAD_PBF="https://download.geofabrik.de/europe/luxembourg-latest.osm.pbf"
-        DOWNLOAD_POLY="https://download.geofabrik.de/europe/luxembourg.poly"
+        echo "WARNING: No import file at /data.osm.pbf, so importing norway as example..."
+        DOWNLOAD_PBF="https://download.geofabrik.de/europe/norway-latest.osm.pbf"
+        DOWNLOAD_POLY="https://download.geofabrik.de/europe/norway.poly"
     fi
 
     if [ -n "$DOWNLOAD_PBF" ]; then
@@ -83,10 +92,28 @@ if [ "$1" = "import" ]; then
 
     service postgresql stop
 
+    mkdir $TILESERVER_DATA_PATH
+
+    tar cz /var/lib/postgresql/12.5/main | split -b 1024MiB - $TILESERVER_DATA_PATH/$TILESERVER_DATA_LABEL.tgz_
+
+    mkdir $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL
+
+    cp $TILESERVER_DATA_PATH/*.tgz* $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL
+
     exit 0
 fi
 
-if [ "$1" = "run" ]; then
+if [ "$TILESERVER_MODE" == "RESTORE" ]; then
+    mkdir -p $TILESERVER_DATA_PATH
+
+    cp $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL/*.tgz* $TILESERVER_DATA_PATH
+
+    # Remove any files present in the target directory
+    rm -rf /var/lib/postgresql/12.5/main/*
+
+    # Extract the archive
+    cat $TILESERVER_DATA_PATH/$TILESERVER_DATA_LABEL.tgz_* | tar xz -C /var/lib/postgresql/12.5/main --strip-components=5
+
     # Clean /tmp
     rm -rf /tmp/*
 
