@@ -21,16 +21,7 @@ function setPostgresPassword() {
     sudo -u postgres psql -c "ALTER USER renderer PASSWORD '${PGPASSWORD:-renderer}'"
 }
 
-if [ "$#" -ne 1 ]; then
-    echo "usage: <import|run>"
-    echo "commands:"
-    echo "    import: Set up the database and import /data.osm.pbf"
-    echo "    run: Runs Apache and renderd to serve tiles at /tile/{z}/{x}/{y}.png"
-    echo "environment variables:"
-    echo "    THREADS: defines number of threads used for importing / tile rendering"
-    echo "    UPDATES: consecutive updates (enabled/disabled)"
-    exit 1
-fi
+service apache2 stop
 
 if [ "$TILESERVER_MODE" == "CREATE" ]; then
     # Ensure that database directory is in right state
@@ -94,13 +85,12 @@ if [ "$TILESERVER_MODE" == "CREATE" ]; then
 
     mkdir $TILESERVER_DATA_PATH
 
-    tar cz /var/lib/postgresql/12.5/main | split -b 1024MiB - $TILESERVER_DATA_PATH/$TILESERVER_DATA_LABEL.tgz_
+    tar cz /var/lib/postgresql/12/main | split -b 1024MiB - $TILESERVER_DATA_PATH/$TILESERVER_DATA_LABEL.tgz_
 
     mkdir $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL
 
     cp $TILESERVER_DATA_PATH/*.tgz* $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL
 
-    exit 0
 fi
 
 if [ "$TILESERVER_MODE" == "RESTORE" ]; then
@@ -109,50 +99,47 @@ if [ "$TILESERVER_MODE" == "RESTORE" ]; then
     cp $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL/*.tgz* $TILESERVER_DATA_PATH
 
     # Remove any files present in the target directory
-    rm -rf /var/lib/postgresql/12.5/main/*
+    rm -rf /var/lib/postgresql/12/main/*
 
     # Extract the archive
     cat $TILESERVER_DATA_PATH/$TILESERVER_DATA_LABEL.tgz_* | tar xz -C /var/lib/postgresql/12.5/main --strip-components=5
 
     # Clean /tmp
     rm -rf /tmp/*
-
-    # Fix postgres data privileges
-    chown postgres:postgres /var/lib/postgresql -R
-
-    # Configure Apache CORS
-    if [ "$ALLOW_CORS" == "enabled" ] || [ "$ALLOW_CORS" == "1" ]; then
-        echo "export APACHE_ARGUMENTS='-D ALLOW_CORS'" >> /etc/apache2/envvars
-    fi
-
-    # Initialize PostgreSQL and Apache
-    createPostgresConfig
-    service postgresql start
-    service apache2 restart
-    setPostgresPassword
-
-    # Configure renderd threads
-    sed -i -E "s/num_threads=[0-9]+/num_threads=${THREADS:-4}/g" /usr/local/etc/renderd.conf
-
-    # start cron job to trigger consecutive updates
-    if [ "$UPDATES" = "enabled" ] || [ "$UPDATES" = "1" ]; then
-      /etc/init.d/cron start
-    fi
-
-    # Run while handling docker stop's SIGTERM
-    stop_handler() {
-        kill -TERM "$child"
-    }
-    trap stop_handler SIGTERM
-
-    sudo -u renderer renderd -f -c /usr/local/etc/renderd.conf &
-    child=$!
-    wait "$child"
-
-    service postgresql stop
-
-    exit 0
 fi
 
-echo "invalid command"
-exit 1
+# Fix postgres data privileges
+chown postgres:postgres /var/lib/postgresql -R
+
+# Configure Apache CORS
+if [ "$ALLOW_CORS" == "enabled" ] || [ "$ALLOW_CORS" == "1" ]; then
+    echo "export APACHE_ARGUMENTS='-D ALLOW_CORS'" >> /etc/apache2/envvars
+fi
+
+# Initialize PostgreSQL and Apache
+createPostgresConfig
+service postgresql start
+service apache2 restart
+setPostgresPassword
+
+# Configure renderd threads
+sed -i -E "s/num_threads=[0-9]+/num_threads=${THREADS:-4}/g" /usr/local/etc/renderd.conf
+
+# start cron job to trigger consecutive updates
+if [ "$UPDATES" = "enabled" ] || [ "$UPDATES" = "1" ]; then
+    /etc/init.d/cron start
+fi
+
+# Run while handling docker stop's SIGTERM
+stop_handler() {
+    kill -TERM "$child"
+}
+trap stop_handler SIGTERM
+
+sudo -u renderer renderd -f -c /usr/local/etc/renderd.conf &
+child=$!
+wait "$child"
+
+service postgresql stop
+
+exit 0
