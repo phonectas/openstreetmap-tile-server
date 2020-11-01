@@ -5,6 +5,7 @@ set -x
 TILESERVER_DATA_PATH=${TILESERVER_DATA_PATH:="/tileserverdata"}
 TILESERVER_STORAGE_PATH=${TILESERVER_STORAGE_PATH:="/mnt/azure"}
 TILESERVER_DATA_LABEL=${TILESERVER_DATA_LABEL:="data"}
+NUMTHREADS=${NUMTHREADS:="1"}
 
 if [ "$TILESERVER_MODE" != "CREATE" ] && [ "$TILESERVER_MODE" != "RESTORE" ]; then
     # Default to CREATE
@@ -73,7 +74,7 @@ if [ "$TILESERVER_MODE" == "CREATE" ]; then
     fi
 
     # Import data
-    sudo -u renderer osm2pgsql -d gis --create --slim -G --hstore --tag-transform-script /home/renderer/src/openstreetmap-carto/openstreetmap-carto.lua --number-processes ${THREADS:-4} -S /home/renderer/src/openstreetmap-carto/openstreetmap-carto.style /data.osm.pbf ${OSM2PGSQL_EXTRA_ARGS}
+    sudo -u renderer osm2pgsql -d gis --flatnodes --create --slim -G --hstore --tag-transform-script /home/renderer/src/openstreetmap-carto/openstreetmap-carto.lua --number-processes ${THREADS:-4} -S /home/renderer/src/openstreetmap-carto/openstreetmap-carto.style /data.osm.pbf ${OSM2PGSQL_EXTRA_ARGS}
 
     # Create indexes
     sudo -u postgres psql -d gis -f indexes.sql
@@ -102,7 +103,7 @@ if [ "$TILESERVER_MODE" == "RESTORE" ]; then
     rm -rf /var/lib/postgresql/12/main/*
 
     # Extract the archive
-    cat $TILESERVER_DATA_PATH/$TILESERVER_DATA_LABEL.tgz_* | tar xz -C /var/lib/postgresql/12.5/main --strip-components=5
+    cat $TILESERVER_DATA_PATH/$TILESERVER_DATA_LABEL.tgz_* | tar xz -C /var/lib/postgresql/12/main --strip-components=5
 
     # Clean /tmp
     rm -rf /tmp/*
@@ -123,7 +124,7 @@ service apache2 restart
 setPostgresPassword
 
 # Configure renderd threads
-sed -i -E "s/num_threads=[0-9]+/num_threads=${THREADS:-4}/g" /usr/local/etc/renderd.conf
+sed -i -E "s/num_threads=[0-9]+/num_threads=$NUMTHREADS/g" /usr/local/etc/renderd.conf
 
 # start cron job to trigger consecutive updates
 if [ "$UPDATES" = "enabled" ] || [ "$UPDATES" = "1" ]; then
