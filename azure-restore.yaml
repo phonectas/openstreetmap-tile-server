@@ -36,6 +36,8 @@ spec:
           value: tile-norway-20201031
         - name: TILESERVER_STORAGE_PATH
           value: "/mnt/azure"
+        - name: ALLOW_CORS
+          value: enabled
         volumeMounts:
         - name: azure
           mountPath: /mnt/azure
