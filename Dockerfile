@@ -154,6 +154,9 @@ RUN mkdir -p /run/renderd/ \
   &&  ln  -s  /data/tiles              /var/cache/renderd/tiles                \
 ;
 
+# Do not use vscode with Dockerfile plugin to edit this!
+# The following config lines MUST NOT start with whitespace!
+
 RUN echo '[default] \n\
 URI=/tile/ \n\
 TILEDIR=/var/cache/renderd/tiles \n\

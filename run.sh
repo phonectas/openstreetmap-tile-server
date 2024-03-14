@@ -59,8 +59,8 @@ if [ "$TILESERVER_MODE" == "CREATE" ] || [ "$TILESERVER_MODE" == "CREATESCP" ]; 
     # Download norway as sample if no data is provided
     if [ ! -f /data/region.osm.pbf ] && [ -z "${DOWNLOAD_PBF:-}" ]; then
         echo "WARNING: No import file at /data/region.osm.pbf, so importing norway as example..."
-        DOWNLOAD_PBF="https://download.geofabrik.de/europe/luxembourg-latest.osm.pbf"
-        DOWNLOAD_POLY="https://download.geofabrik.de/europe/luxembourg.poly"
+        DOWNLOAD_PBF="https://download.geofabrik.de/europe/norway-latest.osm.pbf"
+        DOWNLOAD_POLY="https://download.geofabrik.de/europe/norway.poly"
     fi
 
     if [ -n "${DOWNLOAD_PBF:-}" ]; then
@@ -124,12 +124,12 @@ if [ "$TILESERVER_MODE" == "CREATE" ] || [ "$TILESERVER_MODE" == "CREATESCP" ]; 
 
     mkdir $TILESERVER_DATA_PATH
 
-    tar cz /data | split -b 1024MiB - $TILESERVER_DATA_PATH/$TILESERVER_DATA_LABEL.tgz_
+    tar cz /data/database | split -b 1024MiB - $TILESERVER_DATA_PATH/$TILESERVER_DATA_LABEL.tgz_
 
     if [ "$TILESERVER_MODE" == "CREATESCP" ]; then
         mkdir $TILESERVER_DATA_LABEL
-        scp -i /scpkey -r -o StrictHostKeyChecking=no $TILESERVER_DATA_LABEL $TILESERVER_STORAGE_PATH/
-        scp -i /scpkey -o StrictHostKeyChecking=no $TILESERVER_DATA_PATH/*.tgz* $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL
+        scp -i /scpkey/scpkey -r -o StrictHostKeyChecking=no $TILESERVER_DATA_LABEL $TILESERVER_STORAGE_PATH/
+        scp -i /scpkey/scpkey -o StrictHostKeyChecking=no $TILESERVER_DATA_PATH/*.tgz* $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL
     else
         mkdir $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL
         cp $TILESERVER_DATA_PATH/*.tgz* $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL
@@ -145,7 +145,7 @@ if [ "$TILESERVER_MODE" == "RESTORE" ] || [ "$TILESERVER_MODE" == "RESTORESCP" ]
     mkdir -p $TILESERVER_DATA_PATH
 
     if [ "$TILESERVER_MODE" == "RESTORESCP" ]; then
-        scp -i /scpkey -o StrictHostKeyChecking=no $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL/*.tgz* $TILESERVER_DATA_PATH
+        scp -i /scpkey/scpkey -o StrictHostKeyChecking=no $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL/*.tgz* $TILESERVER_DATA_PATH
     else
         cp $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL/*.tgz*  $TILESERVER_DATA_PATH
     fi
@@ -208,6 +208,10 @@ if [ "$TILESERVER_MODE" == "RESTORE" ] || [ "$TILESERVER_MODE" == "RESTORESCP" ]
     trap stop_handler SIGTERM
 
     sudo -u renderer renderd -f -c /etc/renderd.conf &
+
+    # Pre-generate cache, and copy?
+    # render_list -t /data/tiles/ -s /run/renderd/renderd.sock -a -Z 15 -n 4
+
     child=$!
     wait "$child"
 
