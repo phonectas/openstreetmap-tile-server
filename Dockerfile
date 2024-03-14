@@ -3,6 +3,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG C.UTF-8
 ENV LC_ALL C.UTF-8
 
+RUN mkdir -p /scpkey
+
 RUN apt-get update \
 && apt-get install -y --no-install-recommends \
  ca-certificates gnupg lsb-release locales \
@@ -173,7 +175,6 @@ COPY --from=compiler-stylesheet /root/openstreetmap-carto /home/renderer/src/ope
 
 # Start running
 COPY run.sh /
-COPY scpkey /
 ENTRYPOINT ["/run.sh"]
 CMD []
 EXPOSE 80 5432
