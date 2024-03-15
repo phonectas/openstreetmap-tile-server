@@ -208,12 +208,22 @@ if [ "$TILESERVER_MODE" == "RESTORE" ] || [ "$TILESERVER_MODE" == "RESTORESCP" ]
     trap stop_handler SIGTERM
 
     sudo -u renderer renderd -f -c /etc/renderd.conf &
-
-    # Pre-generate cache, and copy?
-    # render_list -t /data/tiles/ -s /run/renderd/renderd.sock -a -Z 15 -n 4
-
     child=$!
-    wait "$child"
+
+    if [ "${TILESERVER_PRERENDER:0}" -gt "0" ]; then
+        sleep 10
+        render_list -t /data/tiles/ -s /run/renderd/renderd.sock -a -Z $TILESERVER_PRERENDER -n 4
+        mkdir -p $TILESERVER_DATA_PATH
+        export TILESERVER_DATA_LABEL_TILE=prerender-$TILESERVER_DATA_LABEL
+        tar cz /data/tiles | split -b 1024MiB - $TILESERVER_DATA_PATH/$TILESERVER_DATA_LABEL_TILE.tgz_
+
+        mkdir $TILESERVER_DATA_LABEL_TILE
+        scp -i /scpkey/scpkey -r -o StrictHostKeyChecking=no $TILESERVER_DATA_LABEL_TILE $TILESERVER_STORAGE_PATH/
+        scp -i /scpkey/scpkey -o StrictHostKeyChecking=no $TILESERVER_DATA_PATH/*.tgz* $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL_TILE
+        kill -9 $child
+    else
+        wait "$child"
+    fi
 
     service postgresql stop
 
