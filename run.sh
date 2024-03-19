@@ -182,6 +182,15 @@ if [ "$TILESERVER_MODE" == "RESTORE" ] || [ "$TILESERVER_MODE" == "RESTORESCP" ]
         echo "export APACHE_ARGUMENTS='-D ALLOW_CORS'" >> /etc/apache2/envvars
     fi
 
+    if [ "$TILESERVER_MODE" == "RESTORESCP" ] && [ "${TILESERVER_PRERENDER:0}" == "0" ]; then
+        mkdir -p $TILESERVER_DATA_PATH
+        export TILESERVER_DATA_LABEL_TILE=prerender-$TILESERVER_DATA_LABEL
+        scp -i /scpkey/scpkey -o StrictHostKeyChecking=no $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL_TILE/*.tgz* $TILESERVER_DATA_PATH
+        cat $TILESERVER_DATA_PATH/$TILESERVER_DATA_LABEL_TILE.tgz_* | tar xz -C /data/tiles --strip-components=2
+        chown -R renderer.renderer /data/tiles/default/
+        rm -rf $TILESERVER_DATA_PATH
+    fi
+
     # Initialize PostgreSQL and Apache
     createPostgresConfig
     service postgresql start
@@ -210,9 +219,25 @@ if [ "$TILESERVER_MODE" == "RESTORE" ] || [ "$TILESERVER_MODE" == "RESTORESCP" ]
     sudo -u renderer renderd -f -c /etc/renderd.conf &
     child=$!
 
-    if [ "${TILESERVER_PRERENDER:0}" -gt "0" ]; then
+    if [ "$TILESERVER_MODE" == "RESTORESCP" ] && [ "${TILESERVER_PRERENDER:0}" == "1" ]; then
         sleep 10
-        render_list -t /data/tiles/ -s /run/renderd/renderd.sock -a -Z $TILESERVER_PRERENDER -n 4
+        # Norway
+        render_list -a -z 1 -Z 1 -x 1 -X 1 -y 0 -Y 0 -n 4 -s /run/renderd/renderd.sock -t /data/tiles/
+        render_list -a -z 2 -Z 2 -x 2 -X 2 -y 0 -Y 1 -n 4 -s /run/renderd/renderd.sock -t /data/tiles/
+        render_list -a -z 3 -Z 3 -x 4 -X 4 -y 1 -Y 2 -n 4 -s /run/renderd/renderd.sock -t /data/tiles/
+        render_list -a -z 4 -Z 4 -x 8 -X 9 -y 3 -Y 4 -n 4 -s /run/renderd/renderd.sock -t /data/tiles/
+        render_list -a -z 5 -Z 5 -x 16 -X 18 -y 6 -Y 9 -n 4 -s /run/renderd/renderd.sock -t /data/tiles/
+        render_list -a -z 6 -Z 6 -x 32 -X 37 -y 13 -Y 19 -n 4 -s /run/renderd/renderd.sock -t /data/tiles/
+        render_list -a -z 7 -Z 7 -x 65 -X 75 -y 26 -Y 38 -n 4 -s /run/renderd/renderd.sock -t /data/tiles/
+        render_list -a -z 8 -Z 8 -x 131 -X 150 -y 53 -Y 77 -n 4 -s /run/renderd/renderd.sock -t /data/tiles/
+        render_list -a -z 9 -Z 9 -x 262 -X 301 -y 107 -Y 154 -n 4 -s /run/renderd/renderd.sock -t /data/tiles/
+        render_list -a -z 10 -Z 10 -x 524 -X 602 -y 214 -Y 309 -n 4 -s /run/renderd/renderd.sock -t /data/tiles/
+        render_list -a -z 11 -Z 11 -x 1049 -X 1204 -y 429 -Y 618 -n 4 -s /run/renderd/renderd.sock -t /data/tiles/
+        render_list -a -z 12 -Z 12 -x 2098 -X 2408 -y 859 -Y 1237 -n 4 -s /run/renderd/renderd.sock -t /data/tiles/
+        render_list -a -z 13 -Z 13 -x 4196 -X 4817 -y 1718 -Y 2475 -n 4 -s /run/renderd/renderd.sock -t /data/tiles/
+        render_list -a -z 14 -Z 14 -x 8392 -X 9634 -y 3437 -Y 4951 -n 4 -s /run/renderd/renderd.sock -t /data/tiles/
+        render_list -a -z 15 -Z 15 -x 16784 -X 19269 -y 6875 -Y 9903 -n 4 -s /run/renderd/renderd.sock -t /data/tiles/
+
         mkdir -p $TILESERVER_DATA_PATH
         export TILESERVER_DATA_LABEL_TILE=prerender-$TILESERVER_DATA_LABEL
         tar cz /data/tiles | split -b 1024MiB - $TILESERVER_DATA_PATH/$TILESERVER_DATA_LABEL_TILE.tgz_
