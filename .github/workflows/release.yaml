@@ -1,0 +1,22 @@
+name: Release
+on:
+  push:
+    branches:
+      - "!*"
+    tags:
+      - "v*"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: olegtarasov/get-tag@v2.1
+      id: tagName
+    - uses: actions/checkout@v2
+    - uses: Azure/docker-login@v1
+      with:
+        login-server: obelixacr.azurecr.io
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+    - run: |        
+        docker build . --file Dockerfile --tag obelixacr.azurecr.io/unifon-tileserver:$GIT_TAG_NAME
+        docker push obelixacr.azurecr.io/unifon-tileserver:$GIT_TAG_NAME

@@ -3,6 +3,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG C.UTF-8
 ENV LC_ALL C.UTF-8
 
+RUN mkdir -p /scpkey
+
 RUN apt-get update \
 && apt-get install -y --no-install-recommends \
  ca-certificates gnupg lsb-release locales \
@@ -83,6 +85,7 @@ RUN apt-get update \
  renderd \
  sudo \
  vim \
+ openssh-client \
 && apt-get clean autoclean \
 && apt-get autoremove --yes \
 && rm -rf /var/lib/{apt,dpkg,cache,log}/
@@ -152,6 +155,9 @@ RUN mkdir -p /run/renderd/ \
   &&  ln  -s  /data/style              /home/renderer/src/openstreetmap-carto  \
   &&  ln  -s  /data/tiles              /var/cache/renderd/tiles                \
 ;
+
+# Do not use vscode with Dockerfile plugin to edit this!
+# The following config lines MUST NOT start with whitespace!
 
 RUN echo '[default] \n\
 URI=/tile/ \n\
