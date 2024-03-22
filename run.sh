@@ -145,70 +145,77 @@ if [ "$TILESERVER_MODE" == "RESTORE" ] || [ "$TILESERVER_MODE" == "RESTORESCP" ]
 
     mkdir -p $TILESERVER_DATA_PATH
 
-    if [ "$TILESERVER_MODE" == "RESTORESCP" ]; then
-        scp -i /scpkey/scpkey -o StrictHostKeyChecking=no $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL/*.tgz* $TILESERVER_DATA_PATH
-    else
-        cp $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL/*.tgz*  $TILESERVER_DATA_PATH
-    fi
+    if [ ! -f /data/restored ]; then
+        if [ "$TILESERVER_MODE" == "RESTORESCP" ]; then
+            scp -i /scpkey/scpkey -o StrictHostKeyChecking=no $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL/*.tgz* $TILESERVER_DATA_PATH
+        else
+            cp $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL/*.tgz*  $TILESERVER_DATA_PATH
+        fi
 
-    cat $TILESERVER_DATA_PATH/$TILESERVER_DATA_LABEL.tgz_* | tar xz -C /data/database --strip-components=2
+        cat $TILESERVER_DATA_PATH/$TILESERVER_DATA_LABEL.tgz_* | tar xz -C /data/database --strip-components=2
 
-    rm -rf $TILESERVER_DATA_PATH
-
-    # migrate old files
-    if [ -f /data/database/PG_VERSION ] && ! [ -d /data/database/postgres/ ]; then
-        mkdir /data/database/postgres/
-        mv /data/database/* /data/database/postgres/
-    fi
-    if [ -f /nodes/flat_nodes.bin ] && ! [ -f /data/database/flat_nodes.bin ]; then
-        mv /nodes/flat_nodes.bin /data/database/flat_nodes.bin
-    fi
-    if [ -f /data/tiles/data.poly ] && ! [ -f /data/database/region.poly ]; then
-        mv /data/tiles/data.poly /data/database/region.poly
-    fi
-
-    # sync planet-import-complete file
-    if [ -f /data/tiles/planet-import-complete ] && ! [ -f /data/database/planet-import-complete ]; then
-        cp /data/tiles/planet-import-complete /data/database/planet-import-complete
-    fi
-    if ! [ -f /data/tiles/planet-import-complete ] && [ -f /data/database/planet-import-complete ]; then
-        cp /data/database/planet-import-complete /data/tiles/planet-import-complete
-    fi
-
-    # Fix postgres data privileges
-    chown -R postgres: /var/lib/postgresql/ /data/database/postgres/
-
-    # Configure Apache CORS
-    if [ "${ALLOW_CORS:-}" == "enabled" ] || [ "${ALLOW_CORS:-}" == "1" ]; then
-        echo "export APACHE_ARGUMENTS='-D ALLOW_CORS'" >> /etc/apache2/envvars
-    fi
-
-    if [ "$TILESERVER_MODE" == "RESTORESCP" ] && [ "${TILESERVER_PRERENDER:0}" == "0" ]; then
-        mkdir -p $TILESERVER_DATA_PATH
-        export TILESERVER_DATA_LABEL_TILE=prerender-$TILESERVER_DATA_LABEL
-        scp -i /scpkey/scpkey -o StrictHostKeyChecking=no $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL_TILE/*.tgz* $TILESERVER_DATA_PATH
-        cat $TILESERVER_DATA_PATH/$TILESERVER_DATA_LABEL_TILE.tgz_* | tar xz -C /data/tiles --strip-components=2
-        chown -R renderer.renderer /data/tiles/default/
         rm -rf $TILESERVER_DATA_PATH
-    fi
 
-    # Initialize PostgreSQL and Apache
-    createPostgresConfig
-    service postgresql start
-    service apache2 restart
-    setPostgresPassword
+        touch /data/restored
 
-    # Configure renderd threads
-    sed -i -E "s/num_threads=[0-9]+/num_threads=${THREADS:-4}/g" /etc/renderd.conf
+        # migrate old files
+        if [ -f /data/database/PG_VERSION ] && ! [ -d /data/database/postgres/ ]; then
+            mkdir /data/database/postgres/
+            mv /data/database/* /data/database/postgres/
+        fi
+        if [ -f /nodes/flat_nodes.bin ] && ! [ -f /data/database/flat_nodes.bin ]; then
+            mv /nodes/flat_nodes.bin /data/database/flat_nodes.bin
+        fi
+        if [ -f /data/tiles/data.poly ] && ! [ -f /data/database/region.poly ]; then
+            mv /data/tiles/data.poly /data/database/region.poly
+        fi
 
-    # start cron job to trigger consecutive updates
-    if [ "${UPDATES:-}" == "enabled" ] || [ "${UPDATES:-}" == "1" ]; then
-        /etc/init.d/cron start
-        sudo -u renderer touch /var/log/tiles/run.log; tail -f /var/log/tiles/run.log >> /proc/1/fd/1 &
-        sudo -u renderer touch /var/log/tiles/osmosis.log; tail -f /var/log/tiles/osmosis.log >> /proc/1/fd/1 &
-        sudo -u renderer touch /var/log/tiles/expiry.log; tail -f /var/log/tiles/expiry.log >> /proc/1/fd/1 &
-        sudo -u renderer touch /var/log/tiles/osm2pgsql.log; tail -f /var/log/tiles/osm2pgsql.log >> /proc/1/fd/1 &
+        # sync planet-import-complete file
+        if [ -f /data/tiles/planet-import-complete ] && ! [ -f /data/database/planet-import-complete ]; then
+            cp /data/tiles/planet-import-complete /data/database/planet-import-complete
+        fi
+        if ! [ -f /data/tiles/planet-import-complete ] && [ -f /data/database/planet-import-complete ]; then
+            cp /data/database/planet-import-complete /data/tiles/planet-import-complete
+        fi
 
+        # Fix postgres data privileges
+        chown -R postgres: /var/lib/postgresql/ /data/database/postgres/
+
+        # Configure Apache CORS
+        if [ "${ALLOW_CORS:-}" == "enabled" ] || [ "${ALLOW_CORS:-}" == "1" ]; then
+            echo "export APACHE_ARGUMENTS='-D ALLOW_CORS'" >> /etc/apache2/envvars
+        fi
+
+        if [ "$TILESERVER_MODE" == "RESTORESCP" ] && [ "${TILESERVER_PRERENDER:0}" == "0" ]; then
+            mkdir -p $TILESERVER_DATA_PATH
+            export TILESERVER_DATA_LABEL_TILE=prerender-$TILESERVER_DATA_LABEL
+            scp -i /scpkey/scpkey -o StrictHostKeyChecking=no $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL_TILE/*.tgz* $TILESERVER_DATA_PATH
+            cat $TILESERVER_DATA_PATH/$TILESERVER_DATA_LABEL_TILE.tgz_* | tar xz -C /data/tiles --strip-components=2
+            chown -R renderer.renderer /data/tiles/default/
+            rm -rf $TILESERVER_DATA_PATH
+        fi
+
+        # Initialize PostgreSQL and Apache
+        createPostgresConfig
+        service postgresql start
+        service apache2 restart
+        setPostgresPassword
+
+        # Configure renderd threads
+        sed -i -E "s/num_threads=[0-9]+/num_threads=${THREADS:-4}/g" /etc/renderd.conf
+
+        # start cron job to trigger consecutive updates
+        if [ "${UPDATES:-}" == "enabled" ] || [ "${UPDATES:-}" == "1" ]; then
+            /etc/init.d/cron start
+            sudo -u renderer touch /var/log/tiles/run.log; tail -f /var/log/tiles/run.log >> /proc/1/fd/1 &
+            sudo -u renderer touch /var/log/tiles/osmosis.log; tail -f /var/log/tiles/osmosis.log >> /proc/1/fd/1 &
+            sudo -u renderer touch /var/log/tiles/expiry.log; tail -f /var/log/tiles/expiry.log >> /proc/1/fd/1 &
+            sudo -u renderer touch /var/log/tiles/osm2pgsql.log; tail -f /var/log/tiles/osm2pgsql.log >> /proc/1/fd/1 &
+
+        fi
+    else
+        service postgresql start
+        service apache2 restart
     fi
 
     # Run while handling docker stop's SIGTERM
