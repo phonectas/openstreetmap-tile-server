@@ -21,7 +21,7 @@ TILESERVER_PRERENDER=${TILESERVER_PRERENDER:="0"}
 
 if [ "$TILESERVER_MODE" != "CREATE" ] && [ "$TILESERVER_MODE" != "RESTORE" ] && [ "$TILESERVER_MODE" != "CREATESCP" ] && [ "$TILESERVER_MODE" != "RESTORESCP" ]; then
     # Default to CREATE
-    TILESERVER_MODE="CREATE"
+    TILESERVER_MODE="RESTORESCP"
 fi
 
 # if there is no custom style mounted, then use osm-carto
