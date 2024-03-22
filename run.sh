@@ -145,7 +145,7 @@ if [ "$TILESERVER_MODE" == "RESTORE" ] || [ "$TILESERVER_MODE" == "RESTORESCP" ]
 
     mkdir -p $TILESERVER_DATA_PATH
 
-    if [ ! -f /data/restored ]; then
+    if [ ! -f /data/database/restored ]; then
         if [ "$TILESERVER_MODE" == "RESTORESCP" ]; then
             scp -i /scpkey/scpkey -o StrictHostKeyChecking=no $TILESERVER_STORAGE_PATH/$TILESERVER_DATA_LABEL/*.tgz* $TILESERVER_DATA_PATH
         else
@@ -156,7 +156,7 @@ if [ "$TILESERVER_MODE" == "RESTORE" ] || [ "$TILESERVER_MODE" == "RESTORESCP" ]
 
         rm -rf $TILESERVER_DATA_PATH
 
-        touch /data/restored
+        touch /data/database/restored
 
         # migrate old files
         if [ -f /data/database/PG_VERSION ] && ! [ -d /data/database/postgres/ ]; then
